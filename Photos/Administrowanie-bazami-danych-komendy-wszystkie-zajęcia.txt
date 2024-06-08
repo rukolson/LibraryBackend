@@ -1,0 +1,338 @@
+---LAB_1---
+
+--1. Sprawdzić swoje uprawnienia na serwerze SQL.
+select * from sys.fn_my_permissions(default, 'SERVER')
+--2. Sprawdzić swoje uprawnienia w bazie danych SQL.
+select * from sys.fn_my_permissions(default, 'DATABASE')
+--3. Utworzyć tabelę o nazwie Dane, zawierająca cztery kolumny:
+--- identyfikator, liczba, autoinkrementacja, klucz główny
+--- nazwa, tekst, 20 znaków
+--- cena, waluta
+--- data, data
+create table dane (
+identyfikator int identity(1,1) primary key,
+nazwa varchar(20),
+cena money,
+[data] date)
+--4. Wykorzystując autoinkrementację dodać do tablicy Dane trzy wiersze:
+
+--Laptop; 1499,99 zł
+--Klawiatura; 180,00 zł
+--Mysz; 40 zł
+insert into dane values
+('laptop',1499.99,getdate()),
+('klawiatura',180,getdate()),
+('mysz',40,getdate())
+
+select * from dane
+
+--5. Zmienić uprawnienia na tabeli usuwając innemu użytkownikowi możliwość przeglądania zawartości tabeli.
+deny select on dane to student
+--6. Sprawdzić swoje uprawnienia na obiekcie innego użytkownika.
+sp_helprotect 'dane'
+
+--7. Cofnąć przyznane zablokowane wcześniej uprawnienie do obiektu. Sprawdzić działanie.
+revoke select on dane to student 
+
+--8. Zablokować uprawnienia aktualizacji, dodawania wierszy oraz zmian w tablicy Dane dla innego użytkownika.
+deny update,insert,alter on dane to student
+sp_helprotect 'dane'
+
+--9. Nadać możliwość dodawania wierszy w tablicy Dane dla innych użytkowników. Sprawdzić działanie i efektywne uprawnienia do niej.
+--Sprawdzić działanie i efektywne uprawnienia na niej.
+grant insert on dane to student
+sp_helprotect 'dane'
+
+--10. Spróbować zablokować wszystkie uprawnienia na obiekcie Dane dla innego użytkownika.
+deny all on dane to student
+sp_helprotect 'dane'
+
+___________________________________________________________________________________________________
+
+
+---LAB_2---
+
+create table produkty (id int primary key, nazwa varchar(100),cena numeric(5,2))
+insert into produkty values (1,'komputer',300),(2,'laptop',800)
+
+--1. Utworzyć rolę o nazwie Rola_Produkty i przypisać jej pełne uprawnienia do tabeli Produkty.
+create role rola_produkty
+go --najpierw tworzy rolę a potem dopiero daje granta
+grant alter,insert,update,delete,select on produkty to rola_produkty
+go
+
+--2. Do roli Rola_Produkty przypisać uprawnienia wykonywania procedury o nazwie WyswietlProdukty.
+create procedure WyswietlProdukty
+as
+begin
+	select * from produkty
+end
+go
+grant execute on WyswietlProdukty to rola_produkty
+
+--3. Przypisać rolę Rola_Produkty własnemu użytkownikowi. Sprawdzić użytkowników przypisanych do roli.
+execute sp_helprolemember 'rola_produkty'
+execute sp_addrolemember 'rola_produkty','student' --przypisujemy mu jedną role
+execute sp_helprolemember 'rola_produkty' --sprawdzamy jacy userzy mają tę rolę
+
+--4. Utworzyć użytkownika o nazwie Uzytkownik1 i umożliwić mu modyfikację tabel.
+go
+use master
+go
+create login Uzytkownik1 with password='student'
+go
+use n2231
+go
+create user Uzytkownik1 for login Uzytkownik1
+go
+grant alter on produkty to Uzytkownik1
+go
+
+--5. Przypisać użytkownikowi utworzonemu w poprzednim punkcie rolę dostępu do danych.
+sp_addrolemember @rolename='db_datareader',@membername='Uzytkownik1'
+
+--6. Sprawdzić wszystkich użytkowników roli dostępu do danych oraz użytkowników roli sysadmin.
+sp_helprolemember @rolename='db_datareader'
+sp_helprolemember @rolename='db_owner' --"sysdamin" bazy
+sp_helpsrvrolemember @srvrolename='sysadmin'
+--7. Sprawdzić wszystkie uprawnienia do serwera dla utworzonego wcześniej użytkownika.
+execute as login='Uzytkownik1' -- wykonujemy jako inny uzytkownik (tylko sysadmin moze uzyc tej komendy)
+go
+select * from sys.fn_my_permissions(default,'SERVER')
+go
+
+--8. Założyć nową bazę danych o nazwie Studenci z plikiem na dysku c w folderze bazy, rozmiar bazy 4MB (przeczytać komunikat błędu), maksymalnie 12MB z przyrostem co 2MB.
+--na dysku c zalozyc folder bazy
+use master
+go
+create database studenci
+on (name='Studenci_database',filename='c:\bazy\studenci.mdf',size=4,maxsize=12,filegrowth=2) 
+go
+--po zalogwaniu trzeba się przełączyć na nowe query SA bo wcześniej zalogowaliśmy się na konto Uzytkownik1 (a on nie ma uprawnien)
+
+--9. Przypisać uprawnienia pełnego dostępu do bazy danych dla utworzonego wcześniej użytkownika.
+sp_helprolemember
+go
+use studenci
+go
+create user uzytkownik1 for login uzytkownik1
+go
+sp_addrolemember @membername='uzytkownik1',@rolename='db_owner'
+go
+sp_helprolemember
+
+--10. Zlokalizować pliki bazy danych i przygotować kopię zapasową systemu.
+backup database studenci
+to disk='c:\bazy\studenci.bak'
+with format,
+mediadescription='Baza 28.04.2024',
+description='Baza studenci',
+compression
+go
+
+--11. Usunąć utworzoną wcześniej rolę i użytkownika.
+use N2231
+go
+sp_droprolemember @membername='student',@rolename='rola_produkty'
+go
+drop role rola_produkty
+go
+drop user Uzytkownik1
+go
+use master
+go
+drop login Uzytkownik1 == najlepiej wylogowac usera i zrestartować bazę
+go
+
+--12. Usunąć utworzoną wcześniej bazę danych.
+drop database studenci
+
+___________________________________________________________________________________________________
+
+---LAB_3---
+
+--1. Założyć bazę danych o nazwie BazaDanych.
+use master
+go 
+create database BazaDanych
+go
+
+--2. Przygotować tabelę o nazwie TabelaDoPartycjonowania, która będzie zawierała bardzo dużo wierszy.
+use BazaDanych
+go
+create table TabelaDoPartycjonowania (id numeric(7) primary key identity(1,1), liczba numeric(10))
+go
+
+--3. Wypełnić tabelę TabelaDoPartycjonowania losowymi wartościami.
+declare @licznik as numeric(5)
+begin
+	set @licznik=1
+	while @licznik<1000
+	begin
+		set @licznik+=1
+		set nocount on
+		insert into TabelaDoPartycjonowania values (ROUND(RAND()*100000,0))
+	end
+end
+select COUNT(*) from TabelaDoPartycjonowania
+
+--4. Utworzyć cztery pliki dla bazy danych na potrzeby partycji.
+use BazaDanych
+go
+alter database bazadanych add filegroup plik1fg
+go
+alter database bazadanych add filegroup plik2fg
+go
+alter database bazadanych add filegroup plik3fg
+go
+alter database bazadanych add filegroup plik4fg
+go
+
+--5. Połączyć fizyczne wystąpienia plików z ich logicznymi nazwami.
+alter database bazadanych add file (name=dane1, filename='c:\bazy\dane1.ndf', size=10mb, maxsize=1000mb, filegrowth=5mb)
+to filegroup plik1fg
+go
+alter database bazadanych add file (name=dane2, filename='c:\bazy\dane2.ndf', size=10mb, maxsize=1000mb, filegrowth=5mb)
+to filegroup plik2fg
+go
+alter database bazadanych add file (name=dane3, filename='c:\bazy\dane3.ndf', size=10mb, maxsize=1000mb, filegrowth=5mb)
+to filegroup plik3fg
+go
+alter database bazadanych add file (name=dane4, filename='c:\bazy\dane4.ndf', size=10mb, maxsize=1000mb, filegrowth=5mb)
+to filegroup plik4fg
+go
+
+--6. Utworzyć partycje dla grup plików.
+create partition function ZakresZbior1F2 (numeric(7))
+as range left for values (1,100000,500000)
+-- plik1fg do 1, plik2fg od 2 do 100000, plik3fg do 500000, plik 4fg powyzej 500000)
+go
+create partition scheme ZakresZbior1S2
+as partition ZakresZbior1F2
+to(plik1fg,plik2fg,plik3fg,plik4fg)
+go
+
+--7. Utworzyć tabelę partycjonowaną.
+create table TabelaPartycjonowana
+(id numeric(7), liczba numeric(10))
+on ZakresZbior1S2(id)
+go
+
+--8. Wczytać dane z TabelaDoPartycjonowania do tabeli TabelaPartycjonowana.
+insert into TabelaPartycjonowana
+select * from TabelaDoPartycjonowania
+
+--9. Założyć na tabelę indeks klastrowy.
+create table tabela (
+k1 int, k2 int, k3 char(100))
+go
+create clustered index table_indeks_klastrowy
+on tabela(k1)
+go
+--10. Założyć na tabelę indeks nieklastrowy.
+create table dane_studentow (
+kodpocztowy varchar(6),
+miejscowosc varchar(30),
+powiat varchar(30),
+wojewodztwo varchar(30),
+nr_indeksu numeric(6))
+go
+create nonclustered index indeksnieklastrowy
+on dane_studentow(kodpocztowy) include (miejscowosc,powiat,wojewodztwo)
+go
+--11. Założyć indeks kompozytowy.
+create table osoba(imie varchar(30), nazwisko varchar(40), nr_indeksu numeric(6))
+go
+create index kompozyt on osoba(imie,nazwisko)
+go
+--12. Usunąć indeksy, tabele i partycje.
+drop index kompozyt on osoba
+go
+drop index indeksnieklastrowy on dane_studentow
+go
+drop index tabela_indeks_klastrowy on tabela
+go
+drop table osoba
+go 
+drop table dane_studentow
+go
+drop table tabela
+
+------LAB_4-----
+--1. Przeprowadzić backup wraz z kompresją danych.
+backup database n1232 to disk='C:\bazy\bazadanych202405111736.bak'
+with format,
+description='Baza - godz. 17:36',
+compression
+go
+backup log n1232 to disk='C:\bazy\bazadanych202405111736.baklog'
+go
+--2. Utworzyć użytkownika dla potrzeb backupu.
+use master
+go
+create login kopia with password='student'
+go
+grant view server state to kopia
+go
+use n1232
+go
+create user kopia for login kopia
+go 
+sp_addrolemember @rolename='db_backupoperator' ,@membername='kopia'
+go
+sp_helplogins 'kopia'
+
+--3. Przeprowadzić archiwizację bazy danych przez utworzonego użytkownika. /// Przelogować się na wyżej utworzonego usera Connect->Database->login i pass w SQL Authentication
+backup database n1232 to disk='C:\bazy\bazadanych202405111746.bak'
+
+--4. Przeprowadzić próbę odtworzenia bazy danych, wcześniej zarchiwizowanej. /// Tez na drugim userze
+restore database n1232 from disk='C:\bazy\bazadanych202405111746.bak'
+with file=1, norecovery
+go
+
+--5. Dokonać kompresji tabeli.
+alter table tabelapartycjonowana rebuild partiotion=1 with (data_compression=row)
+go ---mozna mnożyć kilka razy dla wszystkich tabel
+
+--6. Dodać nową bazę danych. Przeprowadzić jej archiwizację a następnie usunąć ją i przeprowadzić jej odtworzenie. Przeprowadzić Backup bazy oraz jej odtworzenie za pomocą MS SQL Server Management Studio.
+use master
+go
+create database zagubiona
+go
+backup database zagubiona to disk='c:\bazy\zagubiona_1105.bak'
+go
+backup log zagubiona to disk='c:\bazy\zagubiona_1105.baklog'
+go
+drop database zagubiona
+go
+restore database zagubiona from disk='c:\bazy\zagubiona_1105.bak'
+go
+--7. Dodać nowy plik dziennika zdarzeń o nazwie log2 do bazy ABD.
+alter database n1232
+add log file (name=log2,
+filename='c:\bazy\log2.ldf',
+size=2MB,
+maxsize=50MB,
+filegrowth=10%)
+go
+dbcc sqlperf(logspace)
+
+--8. Wyświetlić logi błędów.
+exec sys.sp_readerrorlog
+go
+exec sys.sp_readerrorlog 0,1,'Failed','Login'
+go
+
+--9. Napisać procedurę o nazwie Dziennik, która będzie wyświetlała dziennik zdarzeń systemu.
+create procedure dziennik
+as
+begin
+exec sys.sp_readerrorlog
+end
+go
+dziennik
+go
+
+--10. Wyświetlić dziennik zdarzeń dla baz danych.
+--ponowanych rozwiązań).
+dbcc log('n1232')
