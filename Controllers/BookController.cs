@@ -1,12 +1,9 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using System;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Data;
-using System.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
+using LibraryBackend.Data;
 using LibraryBackend.Models;
 using Microsoft.AspNetCore.Hosting;
 using System.IO;
@@ -17,138 +14,74 @@ namespace LibraryBackend.Controllers
 	[ApiController]
 	public class BookController : ControllerBase
 	{
-		private readonly IConfiguration _configuration;
+		private readonly ApplicationDbContext _context;
 		private readonly IWebHostEnvironment _env;
-		public BookController(IConfiguration configuration, IWebHostEnvironment env)
+
+		public BookController(ApplicationDbContext context, IWebHostEnvironment env)
 		{
-			_configuration = configuration;
+			_context = context;
 			_env = env;
 		}
 
-
 		[HttpGet]
-		public JsonResult Get()
+		public async Task<ActionResult<IEnumerable<Book>>> GetBooks()
 		{
-			string query = @"
-                            select BookId, BookName, Category,
-                            convert(varchar(10),DateOfAdding,120) as DateOfAdding, CoverPicture
-                            from
-                            dbo.Book
-                            ";
+			var books = await _context.Books
+				.Include(b => b.BookCategory)
+				.Select(b => new {
+					b.BookId,
+					b.BookName,
+					CategoryName = b.BookCategory.CategoryName, // Ensure CategoryName is included
+					b.DateOfAdding,
+					b.CoverPicture
+				}).ToListAsync();
 
-			DataTable table = new DataTable();
-			string sqlDataSource = _configuration.GetConnectionString("DefaultConnection");
-			SqlDataReader myReader;
-			using (SqlConnection myCon = new SqlConnection(sqlDataSource))
-			{
-				myCon.Open();
-				using (SqlCommand myCommand = new SqlCommand(query, myCon))
-				{
-					myReader = myCommand.ExecuteReader();
-					table.Load(myReader);
-					myReader.Close();
-					myCon.Close();
-				}
-			}
-
-			return new JsonResult(table);
+			return Ok(books);
 		}
 
-		[HttpPost]
-		public JsonResult Post(Book emp)
+		[HttpPut("{id}")]
+		public async Task<IActionResult> PutBook(int id, Book book)
 		{
-			string query = @"
-                           insert into dbo.Book
-                           (BookName,Category,DateOfAdding,CoverPicture)
-                    values (@BookName,@Category,@DateOfAdding,@CoverPicture)
-                            ";
-
-			DataTable table = new DataTable();
-			string sqlDataSource = _configuration.GetConnectionString("DefaultConnection");
-			SqlDataReader myReader;
-			using (SqlConnection myCon = new SqlConnection(sqlDataSource))
+			if (id != book.BookId)
 			{
-				myCon.Open();
-				using (SqlCommand myCommand = new SqlCommand(query, myCon))
+				return BadRequest();
+			}
+
+			_context.Entry(book).State = EntityState.Modified;
+
+			try
+			{
+				await _context.SaveChangesAsync();
+			}
+			catch (DbUpdateConcurrencyException)
+			{
+				if (!BookExists(id))
 				{
-					myCommand.Parameters.AddWithValue("@BookName", emp.BookName);
-					myCommand.Parameters.AddWithValue("@Category", emp.Category);
-					myCommand.Parameters.AddWithValue("@DateOfAdding", emp.DateOfAdding);
-					myCommand.Parameters.AddWithValue("@CoverPicture", emp.CoverPicture);
-					myReader = myCommand.ExecuteReader();
-					table.Load(myReader);
-					myReader.Close();
-					myCon.Close();
+					return NotFound();
+				}
+				else
+				{
+					throw;
 				}
 			}
 
-			return new JsonResult("Dodano prawidłowo");
-		}
-
-
-		[HttpPut]
-		public JsonResult Put(Book emp)
-		{
-			string query = @"
-                           update dbo.Book
-                           set BookName= @BookName,
-                            Category=@Category,
-                            DateOfAdding=@DateOfAdding,
-                            CoverPicture=@CoverPicture
-                            where BookId=@BookId
-                            ";
-
-			DataTable table = new DataTable();
-			string sqlDataSource = _configuration.GetConnectionString("DefaultConnection");
-			SqlDataReader myReader;
-			using (SqlConnection myCon = new SqlConnection(sqlDataSource))
-			{
-				myCon.Open();
-				using (SqlCommand myCommand = new SqlCommand(query, myCon))
-				{
-					myCommand.Parameters.AddWithValue("@BookId", emp.BookId);
-					myCommand.Parameters.AddWithValue("@BookName", emp.BookName);
-					myCommand.Parameters.AddWithValue("@Category", emp.Category);
-					myCommand.Parameters.AddWithValue("@DateOfAdding", emp.DateOfAdding);
-					myCommand.Parameters.AddWithValue("@CoverPicture", emp.CoverPicture);
-					myReader = myCommand.ExecuteReader();
-					table.Load(myReader);
-					myReader.Close();
-					myCon.Close();
-				}
-			}
-
-			return new JsonResult("Zaktualizowano prawidłowo");
+			return NoContent();
 		}
 
 		[HttpDelete("{id}")]
-		public JsonResult Delete(int id)
+		public async Task<IActionResult> DeleteBook(int id)
 		{
-			string query = @"
-                           delete from dbo.Book
-                            where BookId=@BookId
-                            ";
-
-			DataTable table = new DataTable();
-			string sqlDataSource = _configuration.GetConnectionString("DefaultConnection");
-			SqlDataReader myReader;
-			using (SqlConnection myCon = new SqlConnection(sqlDataSource))
+			var book = await _context.Books.FindAsync(id);
+			if (book == null)
 			{
-				myCon.Open();
-				using (SqlCommand myCommand = new SqlCommand(query, myCon))
-				{
-					myCommand.Parameters.AddWithValue("@BookId", id);
-
-					myReader = myCommand.ExecuteReader();
-					table.Load(myReader);
-					myReader.Close();
-					myCon.Close();
-				}
+				return NotFound();
 			}
 
-			return new JsonResult("Usunięto prawidłowo");
-		}
+			_context.Books.Remove(book);
+			await _context.SaveChangesAsync();
 
+			return NoContent();
+		}
 
 		[Route("SaveFile")]
 		[HttpPost]
@@ -170,10 +103,13 @@ namespace LibraryBackend.Controllers
 			}
 			catch (Exception)
 			{
-
 				return new JsonResult("anonymous.png");
 			}
 		}
 
+		private bool BookExists(int id)
+		{
+			return _context.Books.Any(e => e.BookId == id);
+		}
 	}
 }

@@ -1,13 +1,10 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using System;
+﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Data;
-using System.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
 using LibraryBackend.Models;
+using LibraryBackend.Data;
 
 namespace LibraryBackend.Controllers
 {
@@ -15,125 +12,75 @@ namespace LibraryBackend.Controllers
 	[ApiController]
 	public class BookCategoryController : ControllerBase
 	{
+		private readonly ApplicationDbContext _context;
 
-		private readonly IConfiguration _configuration;
-		public BookCategoryController(IConfiguration configuration)
+		public BookCategoryController(ApplicationDbContext context)
 		{
-			_configuration = configuration;
+			_context = context;
 		}
 
-
 		[HttpGet]
-		public JsonResult Get()
+		public async Task<ActionResult<IEnumerable<BookCategory>>> Get()
 		{
-			string query = @"
-                            select CategoryId, CategoryName from
-                            dbo.BookCategory
-                            ";
-
-			DataTable table = new DataTable();
-			string sqlDataSource = _configuration.GetConnectionString("DefaultConnection");
-			SqlDataReader myReader;
-			using (SqlConnection myCon = new SqlConnection(sqlDataSource))
-			{
-				myCon.Open();
-				using (SqlCommand myCommand = new SqlCommand(query, myCon))
-				{
-					myReader = myCommand.ExecuteReader();
-					table.Load(myReader);
-					myReader.Close();
-					myCon.Close();
-				}
-			}
-
-			return new JsonResult(table);
+			return await _context.BookCategories.ToListAsync();
 		}
 
 		[HttpPost]
-		public JsonResult Post(BookCategory dep)
+		public async Task<ActionResult<BookCategory>> Post(BookCategory category)
 		{
-			string query = @"
-                           insert into dbo.BookCategory
-                           values (@CategoryName)
-                            ";
+			_context.BookCategories.Add(category);
+			await _context.SaveChangesAsync();
 
-			DataTable table = new DataTable();
-			string sqlDataSource = _configuration.GetConnectionString("DefaultConnection");
-			SqlDataReader myReader;
-			using (SqlConnection myCon = new SqlConnection(sqlDataSource))
-			{
-				myCon.Open();
-				using (SqlCommand myCommand = new SqlCommand(query, myCon))
-				{
-					myCommand.Parameters.AddWithValue("@CategoryName", dep.CategoryName);
-					myReader = myCommand.ExecuteReader();
-					table.Load(myReader);
-					myReader.Close();
-					myCon.Close();
-				}
-			}
-
-			return new JsonResult("Added Successfully");
+			return CreatedAtAction(nameof(Get), new { id = category.CategoryId }, category);
 		}
 
-
-		[HttpPut]
-		public JsonResult Put(BookCategory dep)
+		[HttpPut("{id}")]
+		public async Task<IActionResult> Put(int id, BookCategory category)
 		{
-			string query = @"
-                           update dbo.BookCategory
-                           set CategoryName= @CategoryName
-                            where CategoryId=@CategoryId
-                            ";
-
-			DataTable table = new DataTable();
-			string sqlDataSource = _configuration.GetConnectionString("DefaultConnection");
-			SqlDataReader myReader;
-			using (SqlConnection myCon = new SqlConnection(sqlDataSource))
+			if (id != category.CategoryId)
 			{
-				myCon.Open();
-				using (SqlCommand myCommand = new SqlCommand(query, myCon))
+				return BadRequest();
+			}
+
+			_context.Entry(category).State = EntityState.Modified;
+
+			try
+			{
+				await _context.SaveChangesAsync();
+			}
+			catch (DbUpdateConcurrencyException)
+			{
+				if (!BookCategoryExists(id))
 				{
-					myCommand.Parameters.AddWithValue("@CategoryId", dep.CategoryId);
-					myCommand.Parameters.AddWithValue("@CategoryName", dep.CategoryName);
-					myReader = myCommand.ExecuteReader();
-					table.Load(myReader);
-					myReader.Close();
-					myCon.Close();
+					return NotFound();
+				}
+				else
+				{
+					throw;
 				}
 			}
 
-			return new JsonResult("Updated Successfully");
+			return NoContent();
 		}
 
 		[HttpDelete("{id}")]
-		public JsonResult Delete(int id)
+		public async Task<IActionResult> Delete(int id)
 		{
-			string query = @"
-                           delete from dbo.BookCategory
-                            where CategoryId=@CategoryId
-                            ";
-
-			DataTable table = new DataTable();
-			string sqlDataSource = _configuration.GetConnectionString("DefaultConnection");
-			SqlDataReader myReader;
-			using (SqlConnection myCon = new SqlConnection(sqlDataSource))
+			var category = await _context.BookCategories.FindAsync(id);
+			if (category == null)
 			{
-				myCon.Open();
-				using (SqlCommand myCommand = new SqlCommand(query, myCon))
-				{
-					myCommand.Parameters.AddWithValue("@CategoryId", id);
-
-					myReader = myCommand.ExecuteReader();
-					table.Load(myReader);
-					myReader.Close();
-					myCon.Close();
-				}
+				return NotFound();
 			}
 
-			return new JsonResult("Deleted Successfully");
+			_context.BookCategories.Remove(category);
+			await _context.SaveChangesAsync();
+
+			return NoContent();
 		}
 
-
+		private bool BookCategoryExists(int id)
+		{
+			return _context.BookCategories.Any(e => e.CategoryId == id);
+		}
 	}
 }
