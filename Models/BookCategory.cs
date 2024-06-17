@@ -13,5 +13,7 @@ namespace LibraryBackend.Models
 
 		[Required]
 		public string CategoryName { get; set; }
+
+
 	}
 }

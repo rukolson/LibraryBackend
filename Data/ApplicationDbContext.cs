@@ -21,8 +21,8 @@ namespace LibraryBackend.Data
 			modelBuilder.Entity<Book>()
 				.HasOne(b => b.BookCategory)
 				.WithMany()
-				.HasForeignKey(b => b.CategoryName)
-				.HasPrincipalKey(c => c.CategoryName);
+				.HasForeignKey(b => b.CategoryId)
+				.HasPrincipalKey(c => c.CategoryId);
 		}
 	}
 }

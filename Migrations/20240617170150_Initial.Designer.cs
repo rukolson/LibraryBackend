@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LibraryBackend.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20240615100613_2ndMigration")]
-    partial class _2ndMigration
+    [Migration("20240617170150_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -37,9 +37,8 @@ namespace LibraryBackend.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("CategoryName")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("int");
 
                     b.Property<string>("CoverPicture")
                         .IsRequired()
@@ -50,7 +49,7 @@ namespace LibraryBackend.Migrations
 
                     b.HasKey("BookId");
 
-                    b.HasIndex("CategoryName");
+                    b.HasIndex("CategoryId");
 
                     b.ToTable("Books");
                 });
@@ -65,7 +64,7 @@ namespace LibraryBackend.Migrations
 
                     b.Property<string>("CategoryName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(450)");
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("CategoryId");
 
@@ -76,8 +75,7 @@ namespace LibraryBackend.Migrations
                 {
                     b.HasOne("LibraryBackend.Models.BookCategory", "BookCategory")
                         .WithMany()
-                        .HasForeignKey("CategoryName")
-                        .HasPrincipalKey("CategoryName")
+                        .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

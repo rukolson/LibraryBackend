@@ -2,6 +2,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
+
 namespace LibraryBackend.Models
 {
 	public class Book
@@ -19,9 +20,9 @@ namespace LibraryBackend.Models
 		public string CoverPicture { get; set; }
 
 		[Required]
-		public string CategoryName { get; set; }  // Foreign key
+		public int CategoryId { get; set; }  // Foreign key
 
-		[ForeignKey("CategoryName")]
+		[ForeignKey("CategoryId")]
 		public BookCategory BookCategory { get; set; }  // Navigation property
 	}
 }
