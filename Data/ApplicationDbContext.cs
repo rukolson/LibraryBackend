@@ -20,9 +20,9 @@ namespace LibraryBackend.Data
 			// Define the relationship between Book and BookCategory
 			modelBuilder.Entity<Book>()
 				.HasOne(b => b.BookCategory)
-				.WithMany()
+				.WithMany(c => c.Books)
 				.HasForeignKey(b => b.CategoryId)
-				.HasPrincipalKey(c => c.CategoryId);
+				.OnDelete(DeleteBehavior.Restrict); // Optional: Define delete behavior
 		}
 	}
 }

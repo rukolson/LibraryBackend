@@ -34,8 +34,8 @@ namespace LibraryBackend.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("CategoryId")
-                        .HasColumnType("int");
+                    b.Property<Guid>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("CoverPicture")
                         .IsRequired()
@@ -53,11 +53,9 @@ namespace LibraryBackend.Migrations
 
             modelBuilder.Entity("LibraryBackend.Models.BookCategory", b =>
                 {
-                    b.Property<int>("CategoryId")
+                    b.Property<Guid>("CategoryId")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("CategoryId"));
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("CategoryName")
                         .IsRequired()
@@ -71,12 +69,17 @@ namespace LibraryBackend.Migrations
             modelBuilder.Entity("LibraryBackend.Models.Book", b =>
                 {
                     b.HasOne("LibraryBackend.Models.BookCategory", "BookCategory")
-                        .WithMany()
+                        .WithMany("Books")
                         .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("BookCategory");
+                });
+
+            modelBuilder.Entity("LibraryBackend.Models.BookCategory", b =>
+                {
+                    b.Navigation("Books");
                 });
 #pragma warning restore 612, 618
         }

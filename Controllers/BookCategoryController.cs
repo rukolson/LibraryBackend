@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -28,6 +29,7 @@ namespace LibraryBackend.Controllers
 		[HttpPost]
 		public async Task<ActionResult<BookCategory>> Post(BookCategory category)
 		{
+			category.CategoryId = Guid.NewGuid(); // Generowanie UUID
 			_context.BookCategories.Add(category);
 			await _context.SaveChangesAsync();
 
@@ -35,7 +37,7 @@ namespace LibraryBackend.Controllers
 		}
 
 		[HttpPut("{id}")]
-		public async Task<IActionResult> Put(int id, BookCategory category)
+		public async Task<IActionResult> Put(Guid id, BookCategory category)
 		{
 			if (id != category.CategoryId)
 			{
@@ -64,7 +66,7 @@ namespace LibraryBackend.Controllers
 		}
 
 		[HttpDelete("{id}")]
-		public async Task<IActionResult> Delete(int id)
+		public async Task<IActionResult> Delete(Guid id)
 		{
 			var category = await _context.BookCategories.FindAsync(id);
 			if (category == null)
@@ -78,7 +80,7 @@ namespace LibraryBackend.Controllers
 			return NoContent();
 		}
 
-		private bool BookCategoryExists(int id)
+		private bool BookCategoryExists(Guid id)
 		{
 			return _context.BookCategories.Any(e => e.CategoryId == id);
 		}
